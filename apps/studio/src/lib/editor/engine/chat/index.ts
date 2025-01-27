@@ -24,6 +24,7 @@ export class ChatManager {
         ? MOCK_STREAMING_ASSISTANT_MSG
         : null;
     shouldAutoScroll = true;
+    private disposers: Array<() => void> = [];
 
     constructor(
         private editorEngine: EditorEngine,
@@ -38,10 +39,11 @@ export class ChatManager {
     }
 
     listen() {
-        reaction(
+        const disposer = reaction(
             () => this.stream.content,
             (content) => this.resolveStreamObject(content),
         );
+        this.disposers.push(disposer);
     }
 
     resolveStreamObject(content: string | null) {
@@ -137,6 +139,16 @@ export class ChatManager {
             console.error('No response found');
             return;
         }
+        if (res.status === 'rate-limited') {
+            console.error('Rate limited in chat response', res.content);
+            this.stream.errorMessage = res.content;
+            this.stream.rateLimited = res.rateLimitResult ?? null;
+            sendAnalytics('rate limited', {
+                rateLimitResult: res.rateLimitResult,
+                content: res.content,
+            });
+            return;
+        }
         if (res.status === 'error') {
             console.error('Error found in chat response', res.content);
             this.stream.errorMessage = res.content;
@@ -151,5 +163,26 @@ export class ChatManager {
         if (applyCode) {
             this.code.applyCode(assistantMessage.id);
         }
+    }
+
+    dispose() {
+        // Clean up MobX reactions
+        this.disposers.forEach((dispose) => dispose());
+        this.disposers = [];
+
+        // Clean up stream
+        this.stream.clear();
+        this.streamingMessage = null;
+
+        // Clean up managers
+        this.code?.dispose();
+        this.context?.dispose();
+        if (this.conversation) {
+            this.conversation.current = null;
+        }
+
+        // Clear references
+        this.editorEngine = null as any;
+        this.projectsManager = null as any;
     }
 }

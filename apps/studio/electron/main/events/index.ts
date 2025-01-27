@@ -11,6 +11,7 @@ import { listenForChatMessages } from './chat';
 import { listenForCodeMessages } from './code';
 import { listenForCreateMessages } from './create';
 import { listenForHostingMessages } from './hosting';
+import { listenForPaymentMessages } from './payments';
 import { listenForRunMessages } from './run';
 import { listenForStorageMessages } from './storage';
 
@@ -24,6 +25,13 @@ export function listenForIpcMessages() {
     listenForChatMessages();
     listenForRunMessages();
     listenForHostingMessages();
+    listenForPaymentMessages();
+}
+
+export function removeIpcListeners() {
+    Object.values(MainChannels).forEach((channel) => {
+        ipcMain.removeHandler(channel);
+    });
 }
 
 function listenForGeneralMessages() {
@@ -89,4 +97,8 @@ function listenForGeneralMessages() {
             }
         },
     );
+
+    ipcMain.handle(MainChannels.DELETE_FOLDER, (e: Electron.IpcMainInvokeEvent, args: string) => {
+        return shell.trashItem(args);
+    });
 }

@@ -1,4 +1,4 @@
-import { MainChannels, WebviewChannels } from '@onlook/models/constants';
+import { DefaultSettings, MainChannels, WebviewChannels } from '@onlook/models/constants';
 import { jsonClone } from '@onlook/utility';
 import type { WebviewTag } from 'electron/renderer';
 import { customAlphabet } from 'nanoid/non-secure';
@@ -7,7 +7,11 @@ import { VALID_DATA_ATTR_CHARS } from '/common/helpers/ids';
 export const platformSlash = window.env.PLATFORM === 'win32' ? '\\' : '/';
 
 export function sendAnalytics(event: string, data?: Record<string, any>) {
-    window.api.send(MainChannels.SEND_ANALYTICS, { event, data });
+    try {
+        window.api.send(MainChannels.SEND_ANALYTICS, { event, data });
+    } catch (e) {
+        console.error('Error sending analytics', e);
+    }
 }
 
 export const sendAnalyticsError = (event: string, data?: Record<string, any>) => {
@@ -24,7 +28,7 @@ export function getTruncatedFileName(fileName: string) {
 
 export const getRunProjectCommand = (folderPath: string) => {
     const platformCommand = process.platform === 'win32' ? 'cd /d' : 'cd';
-    return `${platformCommand} ${folderPath} && npm run dev`;
+    return `${platformCommand} ${folderPath} && ${DefaultSettings.COMMANDS.run}`;
 };
 
 export const invokeMainChannel = async <T, P>(channel: MainChannels, ...args: T[]): Promise<P> => {

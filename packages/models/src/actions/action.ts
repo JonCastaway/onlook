@@ -18,7 +18,6 @@ export interface ActionElement extends BaseActionElement {
 export interface UpdateStyleAction {
     type: 'update-style';
     targets: StyleActionTarget[];
-    style: string;
 }
 
 export interface PasteParams {
@@ -86,6 +85,24 @@ export interface WriteCodeAction {
     diffs: CodeDiff[];
 }
 
+export interface ImageContentData {
+    content: string;
+    fileName: string;
+    mimeType: string;
+}
+
+interface BaseImageAction {
+    targets: ActionTarget[];
+    image: ImageContentData;
+}
+export interface InsertImageAction extends BaseImageAction {
+    type: 'insert-image';
+}
+
+export interface RemoveImageAction extends BaseImageAction {
+    type: 'remove-image';
+}
+
 export type Action =
     | UpdateStyleAction
     | InsertElementAction
@@ -94,4 +111,6 @@ export type Action =
     | EditTextAction
     | GroupElementsAction
     | UngroupElementsAction
-    | WriteCodeAction;
+    | WriteCodeAction
+    | InsertImageAction
+    | RemoveImageAction;

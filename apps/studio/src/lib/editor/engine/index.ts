@@ -1,6 +1,6 @@
 import { EditorMode, EditorTabValue } from '@/lib/models';
 import type { ProjectsManager } from '@/lib/projects';
-import { invokeMainChannel } from '@/lib/utils';
+import { invokeMainChannel, sendAnalytics } from '@/lib/utils';
 import { MainChannels } from '@onlook/models/constants';
 import type { NativeImage } from 'electron';
 import { makeAutoObservable } from 'mobx';
@@ -13,6 +13,7 @@ import { CopyManager } from './copy';
 import { ElementManager } from './element';
 import { GroupManager } from './group';
 import { HistoryManager } from './history';
+import { ImageManager } from './image';
 import { InsertManager } from './insert';
 import { MoveManager } from './move';
 import { OverlayManager } from './overlay';
@@ -22,24 +23,27 @@ import { TextEditingManager } from './text';
 import { WebviewManager } from './webview';
 
 export class EditorEngine {
+    private plansOpen: boolean = false;
     private editorMode: EditorMode = EditorMode.DESIGN;
-    private editorPanelTab: EditorTabValue = EditorTabValue.STYLES;
+    private editorPanelTab: EditorTabValue = EditorTabValue.CHAT;
     private canvasManager: CanvasManager;
     private chatManager: ChatManager;
     private webviewManager: WebviewManager;
     private overlayManager: OverlayManager;
+    private codeManager: CodeManager;
+
     private astManager: AstManager = new AstManager(this);
     private historyManager: HistoryManager = new HistoryManager(this);
     private projectInfoManager: ProjectInfoManager = new ProjectInfoManager();
     private elementManager: ElementManager = new ElementManager(this);
     private textEditingManager: TextEditingManager = new TextEditingManager(this);
-    private codeManager: CodeManager = new CodeManager(this);
     private actionManager: ActionManager = new ActionManager(this);
     private insertManager: InsertManager = new InsertManager(this);
     private moveManager: MoveManager = new MoveManager(this);
     private styleManager: StyleManager = new StyleManager(this);
     private copyManager: CopyManager = new CopyManager(this);
     private groupManager: GroupManager = new GroupManager(this);
+    private imageManager: ImageManager = new ImageManager(this);
 
     constructor(private projectsManager: ProjectsManager) {
         makeAutoObservable(this);
@@ -47,6 +51,7 @@ export class EditorEngine {
         this.chatManager = new ChatManager(this, this.projectsManager);
         this.webviewManager = new WebviewManager(this, this.projectsManager);
         this.overlayManager = new OverlayManager(this);
+        this.codeManager = new CodeManager(this, this.projectsManager);
     }
 
     get elements() {
@@ -100,8 +105,14 @@ export class EditorEngine {
     get chat() {
         return this.chatManager;
     }
+    get image() {
+        return this.imageManager;
+    }
     get editPanelTab() {
         return this.editorPanelTab;
+    }
+    get isPlansOpen() {
+        return this.plansOpen;
     }
     set mode(mode: EditorMode) {
         this.editorMode = mode;
@@ -111,9 +122,38 @@ export class EditorEngine {
         this.editorPanelTab = tab;
     }
 
+    set isPlansOpen(open: boolean) {
+        this.plansOpen = open;
+        if (open) {
+            sendAnalytics('open pro checkout');
+        }
+    }
+
     dispose() {
+        // Clear UI state
         this.clear();
+
+        // Clean up all managers
         this.webviews.deregisterAll();
+        this.chatManager?.dispose();
+        this.historyManager?.clear();
+        this.elementManager?.clear();
+        this.actionManager?.dispose();
+        this.overlayManager?.clear();
+        this.astManager?.clear();
+        this.textEditingManager?.clean();
+        this.codeManager?.dispose();
+        this.insertManager?.dispose();
+        this.moveManager?.dispose();
+        this.styleManager?.dispose();
+        this.copyManager?.dispose();
+        this.groupManager?.dispose();
+        this.canvasManager?.clear();
+        this.imageManager?.dispose();
+        // Clear references
+        this.projectsManager = null as any;
+        this.editorMode = EditorMode.DESIGN;
+        this.editorPanelTab = EditorTabValue.STYLES;
     }
 
     clear() {

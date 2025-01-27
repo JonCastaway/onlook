@@ -1,5 +1,5 @@
-import { HOSTING_DOMAIN, MainChannels } from '@onlook/models/constants';
-import { HostingStatus } from '@onlook/models/hosting';
+import { DefaultSettings, HOSTING_DOMAIN, MainChannels } from '@onlook/models/constants';
+import { HostingStatus, type CustomDomain } from '@onlook/models/hosting';
 import type { Project } from '@onlook/models/projects';
 import { makeAutoObservable } from 'mobx';
 import type { ProjectsManager } from '.';
@@ -34,16 +34,16 @@ export class HostingManager {
 
     updateProject(partialProject: Partial<Project>) {
         const newProject = { ...this.project, ...partialProject };
-        this.project = newProject;
         this.projectsManager.updateProject(newProject);
+        this.project = newProject;
     }
 
     private restoreState() {
-        this.state = {
+        this.updateState({
             status: this.project.hosting?.url ? HostingStatus.READY : HostingStatus.NO_ENV,
             message: null,
             url: this.project.hosting?.url || null,
-        };
+        });
     }
 
     async listenForStateChanges() {
@@ -89,13 +89,14 @@ export class HostingManager {
                     url: null,
                 },
             });
-            this.updateState({ url: null, status: HostingStatus.NO_ENV });
+            this.updateState({ status: HostingStatus.ERROR, message: 'Failed to create link' });
             return false;
         }
+        this.updateState({ status: HostingStatus.READY, message: null, url: newUrl });
         return true;
     }
 
-    async publish(): Promise<boolean> {
+    async publish(selectedDomains: string[] = [], skipBuild: boolean = false): Promise<boolean> {
         sendAnalytics('hosting publish');
         const folderPath = this.project.folderPath;
         if (!folderPath) {
@@ -106,7 +107,7 @@ export class HostingManager {
             return false;
         }
 
-        const buildScript: string = this.project.commands?.build || 'npm run build';
+        const buildScript: string = this.project.commands?.build || DefaultSettings.COMMANDS.build;
         if (!buildScript) {
             console.error('Failed to publish hosting environment, missing build script');
             sendAnalyticsError('Failed to publish', {
@@ -115,8 +116,8 @@ export class HostingManager {
             return false;
         }
 
-        const url = this.project.hosting?.url;
-        if (!url) {
+        const urls = selectedDomains.length > 0 ? selectedDomains : [this.project.hosting?.url];
+        if (urls.length === 0) {
             console.error('Failed to publish hosting environment, missing url');
             sendAnalyticsError('Failed to publish', {
                 message: 'Failed to publish hosting environment, missing url',
@@ -132,17 +133,18 @@ export class HostingManager {
         } | null = await invokeMainChannel(MainChannels.START_DEPLOYMENT, {
             folderPath,
             buildScript,
-            url,
+            urls,
+            skipBuild,
         });
 
         if (!res || res.state === HostingStatus.ERROR) {
-            console.error('Failed to publish hosting environment');
+            console.error('Failed to publish hosting environment: ', res);
             this.updateState({
                 status: HostingStatus.ERROR,
-                message: 'Failed to publish hosting environment, no response from client',
+                message: `Failed to publish hosting environment: ${res?.message || 'client error'}`,
             });
             sendAnalyticsError('Failed to publish', {
-                message: 'Failed to publish hosting environment, no response from client',
+                message: `Failed to publish hosting environment: ${res?.message || 'client error'}`,
             });
             return false;
         }
@@ -150,20 +152,30 @@ export class HostingManager {
         sendAnalytics('hosting publish success', {
             state: res.state,
             message: res.message,
+            urls: urls,
         });
 
         this.updateState({ status: res.state, message: res.message });
         return true;
     }
 
-    async unpublish() {
+    async unpublish(selectedDomains: string[] = []) {
         this.updateState({ status: HostingStatus.DELETING, message: 'Deleting deployment...' });
         sendAnalytics('hosting unpublish');
+
+        const urls = selectedDomains.length > 0 ? selectedDomains : [this.state.url];
+        if (urls.length === 0) {
+            console.error('Failed to unpublish hosting environment, missing url');
+            sendAnalyticsError('Failed to unpublish', {
+                message: 'Failed to unpublish hosting environment, missing url',
+            });
+            return;
+        }
         const res: {
             success: boolean;
             message?: string;
         } = await invokeMainChannel(MainChannels.UNPUBLISH_HOSTING_ENV, {
-            url: this.state.url,
+            urls,
         });
 
         if (!res.success) {
@@ -185,6 +197,11 @@ export class HostingManager {
         });
         this.updateState({ status: HostingStatus.NO_ENV, message: null, url: null });
         sendAnalytics('hosting unpublish success');
+    }
+
+    async getCustomDomains(): Promise<CustomDomain[]> {
+        const res: CustomDomain[] = await invokeMainChannel(MainChannels.GET_CUSTOM_DOMAINS);
+        return res;
     }
 
     async dispose() {

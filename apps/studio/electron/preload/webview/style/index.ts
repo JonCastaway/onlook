@@ -76,19 +76,21 @@ class CSSManager {
         return matchingNodes;
     }
 
-    public updateStyle(domId: string, jsStyle: string, value: string) {
+    public updateStyle(domId: string, style: Record<string, string>) {
         const selector = selectorFromDomId(domId, false);
-        const property = this.jsToCssProperty(jsStyle);
         const ast = this.stylesheet;
-        const matchingNodes = this.find(ast, selector);
-        if (!matchingNodes.length) {
-            this.addRule(ast, selector, property, value);
-        } else {
-            matchingNodes.forEach((node) => {
-                if (node.type === 'Rule') {
-                    this.updateRule(node, property, value);
-                }
-            });
+        for (const [property, value] of Object.entries(style)) {
+            const cssProperty = this.jsToCssProperty(property);
+            const matchingNodes = this.find(ast, selector);
+            if (!matchingNodes.length) {
+                this.addRule(ast, selector, cssProperty, value);
+            } else {
+                matchingNodes.forEach((node) => {
+                    if (node.type === 'Rule') {
+                        this.updateRule(node, cssProperty, value);
+                    }
+                });
+            }
         }
         this.stylesheet = ast;
     }
@@ -192,6 +194,23 @@ class CSSManager {
             return '';
         }
         return key.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
+    }
+
+    public removeStyles(domId: string, jsStyles: string[]) {
+        const selector = selectorFromDomId(domId, false);
+        const ast = this.stylesheet;
+        const matchingNodes = this.find(ast, selector);
+
+        matchingNodes.forEach((node) => {
+            if (node.type === 'Rule') {
+                const cssProperties = jsStyles.map((style) => this.jsToCssProperty(style));
+                node.block.children = node.block.children.filter(
+                    (decl: CssNode) => !cssProperties.includes((decl as Declaration).property),
+                );
+            }
+        });
+
+        this.stylesheet = ast;
     }
 }
 

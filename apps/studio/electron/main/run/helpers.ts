@@ -1,5 +1,7 @@
 import { type GeneratorOptions } from '@babel/generator';
+import type { NodePath } from '@babel/traverse';
 import * as t from '@babel/types';
+import { CUSTOM_OUTPUT_DIR } from '@onlook/models/constants';
 import type {
     CoreElementType,
     DynamicType,
@@ -10,11 +12,25 @@ import * as fs from 'fs';
 import { customAlphabet } from 'nanoid/non-secure';
 import * as nodePath from 'path';
 import { VALID_DATA_ATTR_CHARS } from '/common/helpers/ids';
-import type { NodePath } from '@babel/traverse';
 
 export const ALLOWED_EXTENSIONS = ['.jsx', '.tsx'];
-export const IGNORED_DIRECTORIES = ['node_modules', 'dist', 'build', '.next', '.git'];
-export const generateCodeOptions: GeneratorOptions = { retainLines: true, compact: false };
+export const IGNORED_DIRECTORIES = [
+    'node_modules',
+    'dist',
+    'build',
+    '.next',
+    '.git',
+    CUSTOM_OUTPUT_DIR,
+];
+
+export const GENERATE_CODE_OPTIONS: GeneratorOptions = {
+    compact: false, // Keep normal spacing
+    retainLines: true, // Retain original line numbers
+    jsescOption: {
+        minimal: true, // Nice string escaping
+    },
+    jsonCompatibleStrings: true, // Readable string literals
+};
 
 export const generateId = customAlphabet(VALID_DATA_ATTR_CHARS, 7);
 

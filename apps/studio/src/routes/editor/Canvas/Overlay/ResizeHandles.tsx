@@ -244,6 +244,7 @@ interface ResizeHandlesProps {
     top: number;
     width: number;
     height: number;
+    borderRadius: number;
     isComponent?: boolean;
     styles: Record<string, string>;
 }
@@ -251,6 +252,7 @@ interface ResizeHandlesProps {
 export const ResizeHandles: React.FC<ResizeHandlesProps> = ({
     width,
     height,
+    borderRadius,
     isComponent,
     styles,
 }) => {
@@ -259,7 +261,7 @@ export const ResizeHandles: React.FC<ResizeHandlesProps> = ({
 
     // Calculate radius handle position (20px or 25% of width/height, whichever is smaller)
     const radiusOffset = Math.min(20, width * 0.25, height * 0.25);
-    const showRadius = false; //width >= 10 && height >= 10;
+    const showRadius = width >= 10 && height >= 10;
 
     const updateWidth = (newWidth: string) => {
         editorEngine.style.update('width', newWidth);
@@ -267,6 +269,13 @@ export const ResizeHandles: React.FC<ResizeHandlesProps> = ({
 
     const updateHeight = (newHeight: string) => {
         editorEngine.style.update('height', newHeight);
+    };
+
+    const updateWidthHeight = (newWidth: string, newHeight: string) => {
+        editorEngine.style.updateMultiple({
+            width: newWidth,
+            height: newHeight,
+        });
     };
 
     const updateRadius = (newRadius: string) => {
@@ -327,15 +336,24 @@ export const ResizeHandles: React.FC<ResizeHandlesProps> = ({
                 },
             );
 
-            // Update styles with new dimensions
-            if (newElementDimensions.width !== startDimensions.width) {
+            const widthChanged = newElementDimensions.width !== startDimensions.width;
+            const heightChanged = newElementDimensions.height !== startDimensions.height;
+
+            if (widthChanged && heightChanged) {
+                updateWidthHeight(
+                    `${newElementDimensions.width}px`,
+                    `${newElementDimensions.height}px`,
+                );
+                editorEngine.overlay.state.updateClickedRects({
+                    width: newOverlayDimensions.width,
+                    height: newOverlayDimensions.height,
+                });
+            } else if (widthChanged) {
                 updateWidth(`${newElementDimensions.width}px`);
                 editorEngine.overlay.state.updateClickedRects({
                     width: newOverlayDimensions.width,
                 });
-            }
-
-            if (newElementDimensions.height !== startDimensions.height) {
+            } else if (heightChanged) {
                 updateHeight(`${newElementDimensions.height}px`);
                 editorEngine.overlay.state.updateClickedRects({
                     height: newOverlayDimensions.height,
@@ -361,7 +379,42 @@ export const ResizeHandles: React.FC<ResizeHandlesProps> = ({
         position: ResizeHandlePosition,
         styles: Record<string, string>,
     ) => {
-        console.log('handleMouseDownRadius');
+        startEvent.preventDefault();
+        startEvent.stopPropagation();
+
+        editorEngine.history.startTransaction();
+        const startX = startEvent.clientX;
+        const startY = startEvent.clientY;
+        const startRadius = borderRadius;
+
+        const captureOverlay = createCaptureOverlay(startEvent);
+
+        const onMouseMove = (moveEvent: MouseEvent) => {
+            moveEvent.preventDefault();
+            moveEvent.stopPropagation();
+
+            const deltaX = moveEvent.clientX - startX;
+            const deltaY = moveEvent.clientY - startY;
+
+            // Use the larger of the two deltas for a more natural radius adjustment
+            const delta = Math.max(Math.abs(deltaX), Math.abs(deltaY)) * Math.sign(deltaX + deltaY);
+            const adjustedDelta = adaptValueToCanvas(delta, true);
+
+            const newRadius = Math.max(0, startRadius + adjustedDelta);
+            updateRadius(`${Math.round(newRadius)}px`);
+        };
+
+        const onMouseUp = (upEvent: MouseEvent) => {
+            upEvent.preventDefault();
+            upEvent.stopPropagation();
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            document.body.removeChild(captureOverlay);
+            editorEngine.history.commitTransaction();
+        };
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
     };
 
     return (

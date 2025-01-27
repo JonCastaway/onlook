@@ -61,7 +61,7 @@ export class ChatContext {
                 continue;
             }
 
-            const codeBlock = await this.editorEngine.code.getCodeBlock(oid);
+            const codeBlock = await this.editorEngine.code.getCodeBlock(oid, true);
             if (codeBlock === null) {
                 continue;
             }
@@ -87,5 +87,13 @@ export class ChatContext {
 
     clear() {
         this.context = [];
+    }
+
+    dispose() {
+        // Clear context
+        this.clear();
+
+        // Clear references
+        this.editorEngine = null as any;
     }
 }

@@ -7,7 +7,7 @@ import { mainWindow } from '..';
 import { sendAnalytics } from '../analytics';
 import { writeFile } from '../code/files';
 import { removeIdsFromDirectory } from './cleanup';
-import { getValidFiles } from './helpers';
+import { ALLOWED_EXTENSIONS, getValidFiles } from './helpers';
 import { createMappingFromContent, getFileWithIds as getFileContentWithIds } from './setup';
 import terminal from './terminal';
 
@@ -147,8 +147,18 @@ class RunManager {
                 this.processFileForMapping(filePath);
             })
             .on('error', (error) => {
-                console.error(`Watcher error: ${error.toString()}`);
+                console.error(`Watcher error: ${error}`);
             });
+    }
+
+    addFileToWatcher(filePath: string) {
+        for (const allowedExtension of ALLOWED_EXTENSIONS) {
+            if (filePath.endsWith(allowedExtension)) {
+                this.watcher?.add(filePath);
+                this.processFileForMapping(filePath);
+                break;
+            }
+        }
     }
 
     async addIdsToDirectoryAndCreateMapping(dirPath: string): Promise<string[]> {

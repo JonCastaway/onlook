@@ -6,7 +6,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@onlook/ui/tooltip';
 import { observer } from 'mobx-react-lite';
 import ModeToggle from './ModeToggle';
 import OpenCode from './OpenCode';
+import ProfileDropdown from './Profile';
 import ProjectBreadcrumb from './ProjectSelect';
+import ShareProject from './ShareProject';
 import ZoomControls from './ZoomControls';
 import { Hotkey } from '/common/hotkeys';
 
@@ -80,7 +82,8 @@ const EditorTopBar = observer(() => {
             <div className="flex flex-grow basis-0 justify-end items-center">
                 <ZoomControls />
                 <OpenCode />
-                {/* <ShareProject /> */}
+                <ShareProject />
+                <ProfileDropdown />
             </div>
         </div>
     );

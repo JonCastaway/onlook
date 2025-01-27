@@ -1,12 +1,21 @@
 import { addNextBuildConfig } from '@onlook/foundation';
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'fs';
+import { CUSTOM_OUTPUT_DIR } from '@onlook/models/constants';
+import {
+    appendFileSync,
+    copyFileSync,
+    existsSync,
+    mkdirSync,
+    readdirSync,
+    readFileSync,
+    statSync,
+} from 'fs';
 import { isBinary } from 'istextorbinary';
 import { exec } from 'node:child_process';
 import { join } from 'node:path';
 
 const SUPPORTED_LOCK_FILES = ['bun.lock', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml'];
 
-type FileRecord = Record<
+export type FileRecord = Record<
     string,
     {
         content: string;
@@ -69,16 +78,22 @@ export async function postprocessNextBuild(projectDir: string): Promise<{
     if (!entrypointExists) {
         return {
             success: false,
-            error: 'Failed to find entrypoint server.js in .next/standalone',
+            error: `Failed to find entrypoint server.js in ${CUSTOM_OUTPUT_DIR}/standalone`,
         };
     }
 
-    copyDir(projectDir + '/public', projectDir + '/.next/standalone/public');
-    copyDir(projectDir + '/.next/static', projectDir + '/.next/standalone/.next/static');
+    copyDir(`${projectDir}/public`, `${projectDir}/${CUSTOM_OUTPUT_DIR}/standalone/public`);
+    copyDir(
+        `${projectDir}/${CUSTOM_OUTPUT_DIR}/static`,
+        `${projectDir}/${CUSTOM_OUTPUT_DIR}/standalone/${CUSTOM_OUTPUT_DIR}/static`,
+    );
 
     for (const lockFile of SUPPORTED_LOCK_FILES) {
-        if (existsSync(projectDir + '/' + lockFile)) {
-            copyFileSync(projectDir + '/' + lockFile, projectDir + '/.next/standalone/' + lockFile);
+        if (existsSync(`${projectDir}/${lockFile}`)) {
+            copyFileSync(
+                `${projectDir}/${lockFile}`,
+                `${projectDir}/${CUSTOM_OUTPUT_DIR}/standalone/${lockFile}`,
+            );
             return { success: true };
         }
     }
@@ -90,7 +105,7 @@ export async function postprocessNextBuild(projectDir: string): Promise<{
 }
 
 async function checkEntrypointExists(projectDir: string) {
-    return existsSync(join(projectDir, '/.next/standalone/server.js'));
+    return existsSync(join(projectDir, `/${CUSTOM_OUTPUT_DIR}/standalone/server.js`));
 }
 
 export function copyDir(src: string, dest: string) {
@@ -136,4 +151,32 @@ export function runBuildScript(
             },
         );
     });
+}
+
+export function updateGitignore(projectDir: string, target: string): boolean {
+    const gitignorePath = join(projectDir, '.gitignore');
+
+    try {
+        // Create .gitignore if it doesn't exist
+        if (!existsSync(gitignorePath)) {
+            appendFileSync(gitignorePath, target + '\n');
+            return true;
+        }
+
+        // Check if target is already in the file
+        const gitignoreContent = readFileSync(gitignorePath, 'utf-8');
+        const lines = gitignoreContent.split(/\r?\n/);
+
+        // Look for exact match of target
+        if (!lines.some((line) => line.trim() === target)) {
+            // Ensure there's a newline before adding if the file doesn't end with one
+            const separator = gitignoreContent.endsWith('\n') ? '' : '\n';
+            appendFileSync(gitignorePath, `${separator}${target}\n`);
+        }
+
+        return true;
+    } catch (error) {
+        console.error(`Failed to update .gitignore: ${error}`);
+        return false;
+    }
 }

@@ -4,8 +4,10 @@ import type {
     EditTextAction,
     GroupElementsAction,
     InsertElementAction,
+    InsertImageAction,
     MoveElementAction,
     RemoveElementAction,
+    RemoveImageAction,
     UngroupElementsAction,
     UpdateStyleAction,
 } from '@onlook/models/actions';
@@ -66,12 +68,18 @@ export class ActionManager {
                 break;
             case 'write-code':
                 break;
+            case 'insert-image':
+                this.insertImage(action);
+                break;
+            case 'remove-image':
+                this.removeImage(action);
+                break;
             default:
                 assertNever(action);
         }
     }
 
-    updateStyle({ targets, style }: UpdateStyleAction) {
+    updateStyle({ targets }: UpdateStyleAction) {
         targets.forEach((target) => {
             const webview = this.editorEngine.webviews.getWebview(target.webviewId);
             if (!webview) {
@@ -80,8 +88,7 @@ export class ActionManager {
             }
             sendToWebview(webview, WebviewChannels.UPDATE_STYLE, {
                 domId: target.domId,
-                style,
-                value: target.change.updated,
+                change: target.change,
             });
         });
     }
@@ -159,4 +166,33 @@ export class ActionManager {
         }
         sendToWebview(webview, WebviewChannels.UNGROUP_ELEMENTS, { parent, container, children });
     }
+
+    private insertImage({ targets, image }: InsertImageAction) {
+        targets.forEach((target) => {
+            const webview = this.editorEngine.webviews.getWebview(target.webviewId);
+            if (!webview) {
+                console.error('Failed to get webview');
+                return;
+            }
+            sendToWebview(webview, WebviewChannels.INSERT_IMAGE, {
+                domId: target.domId,
+                image,
+            });
+        });
+    }
+
+    private removeImage({ targets }: RemoveImageAction) {
+        targets.forEach((target) => {
+            const webview = this.editorEngine.webviews.getWebview(target.webviewId);
+            if (!webview) {
+                console.error('Failed to get webview');
+                return;
+            }
+            sendToWebview(webview, WebviewChannels.REMOVE_IMAGE, {
+                domId: target.domId,
+            });
+        });
+    }
+
+    dispose() {}
 }

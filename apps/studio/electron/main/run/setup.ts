@@ -6,7 +6,7 @@ import { generateCode } from '../code/diff/helpers';
 import { formatContent, readFile } from '../code/files';
 import { parseJsxFile } from '../code/helpers';
 import {
-    generateCodeOptions,
+    GENERATE_CODE_OPTIONS,
     generateId,
     getCoreElementInfo,
     getDynamicTypeInfo,
@@ -17,9 +17,13 @@ import {
 
 export async function getFileWithIds(filePath: string): Promise<string | null> {
     const content = await readFile(filePath);
-    if (!content) {
+    if (content === null) {
         console.error(`Failed to read file: ${filePath}`);
         return null;
+    }
+    if (content === '') {
+        console.error(`File is empty: ${filePath}`);
+        return '';
     }
     const ast = parseJsxFile(content);
     if (!ast) {
@@ -27,7 +31,7 @@ export async function getFileWithIds(filePath: string): Promise<string | null> {
         return content;
     }
     addIdsToAst(ast);
-    const generated = generateCode(ast, generateCodeOptions, content);
+    const generated = generateCode(ast, GENERATE_CODE_OPTIONS, content);
     const formatted = await formatContent(filePath, generated);
     return formatted;
 }
